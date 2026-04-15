@@ -149,7 +149,7 @@ body * {
   pointer-events: none;
   z-index: 100000;
   transform: translate(-50%, -50%);
-  transition: width 0.2s, height 0.2s, border-color 0.2s;
+  will-change: transform;
   mix-blend-mode: screen;
 }
 
@@ -182,7 +182,7 @@ body * {
   background: radial-gradient(circle, rgba(0, 255, 209, 0.12) 0%, rgba(0, 255, 209, 0.04) 40%, transparent 70%);
   mix-blend-mode: screen;
   opacity: 0;
-  transition: opacity 0.5s;
+  will-change: transform;
 }
 
 .ocean-cursor-light.active {
@@ -366,12 +366,12 @@ body * {
 /* Creature Card */
 .creature-card {
   position: relative;
-  background: rgba(5, 10, 14, 0.8);
+  background: rgba(5, 10, 14, 0.9);
   border: 1px solid rgba(0, 255, 209, 0.1);
   border-radius: 16px;
   overflow: hidden;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(10px);
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+  will-change: transform;
 }
 
 .creature-card:hover {
@@ -606,7 +606,9 @@ body * {
 }
 
 .float-slow {
+  display: inline-block;
   animation: float 6s ease-in-out infinite;
+  will-change: transform;
 }
 
 .float-medium {
@@ -654,7 +656,6 @@ body * {
   z-index: 2;
   pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.6) 100%);
-  transition: opacity 0.3s;
 }
 
 /* Pressure Lab */
@@ -1015,6 +1016,7 @@ body * {
 
 .buoyancy-drift {
   animation: buoyancyDrift 8s ease-in-out infinite;
+  will-change: transform;
 }
 
 /* Jellyfish tentacle animation */

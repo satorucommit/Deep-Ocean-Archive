@@ -22,6 +22,12 @@ function ParticleCanvas({ depth, isLightOn }: { depth: number; isLightOn: boolea
     drift: number; glow: boolean;
   }>>([]);
   const animRef = useRef<number>(0);
+  const depthRef = useRef(depth);
+  const isLightOnRef = useRef(isLightOn);
+
+  // Keep refs in sync without restarting the animation loop
+  depthRef.current = depth;
+  isLightOnRef.current = isLightOn;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -36,7 +42,6 @@ function ParticleCanvas({ depth, isLightOn }: { depth: number; isLightOn: boolea
     resize();
     window.addEventListener('resize', resize);
 
-    // Initialize particles
     const count = 80;
     particlesRef.current = Array.from({ length: count }, () => ({
       x: Math.random() * canvas.width,
@@ -51,16 +56,15 @@ function ParticleCanvas({ depth, isLightOn }: { depth: number; isLightOn: boolea
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const depthFactor = Math.min(1, depth / 11000);
+      const d = depthRef.current;
+      const depthFactor = Math.min(1, d / 11000);
       const particleOpacity = 0.15 + depthFactor * 0.4;
-      const glowIntensity = depth > 500 ? Math.min(1, (depth - 500) / 2000) : 0;
+      const glowIntensity = d > 500 ? Math.min(1, (d - 500) / 2000) : 0;
 
       particlesRef.current.forEach(p => {
-        // Update position - particles drift upward like marine snow
         p.y -= p.speed;
         p.x += p.drift + Math.sin(Date.now() * 0.001 + p.x * 0.01) * 0.2;
 
-        // Wrap around
         if (p.y < -10) { p.y = canvas.height + 10; p.x = Math.random() * canvas.width; }
         if (p.x < -10) p.x = canvas.width + 10;
         if (p.x > canvas.width + 10) p.x = -10;
@@ -68,7 +72,6 @@ function ParticleCanvas({ depth, isLightOn }: { depth: number; isLightOn: boolea
         const finalOpacity = p.opacity * particleOpacity;
 
         if (p.glow && glowIntensity > 0) {
-          // Bioluminescent particle
           const glowSize = p.size * 4;
           const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowSize);
           const hue = 170 + Math.sin(Date.now() * 0.002 + p.x) * 20;
@@ -80,7 +83,6 @@ function ParticleCanvas({ depth, isLightOn }: { depth: number; isLightOn: boolea
           ctx.fill();
         }
 
-        // Core particle
         ctx.fillStyle = `rgba(180, 220, 255, ${finalOpacity})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -96,7 +98,7 @@ function ParticleCanvas({ depth, isLightOn }: { depth: number; isLightOn: boolea
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animRef.current);
     };
-  }, [depth, isLightOn]);
+  }, []); // run once on mount only
 
   return <canvas ref={canvasRef} className="particle-canvas" />;
 }
@@ -294,7 +296,7 @@ function CreatureCard({
       <div
         className={`creature-card ${isVulnerable ? 'creature-card-endangered' : ''} ${isDiscovered ? '' : 'opacity-70'} buoyancy-drift`}
         onClick={handleCardClick}
-        style={{ animationDelay: `${Math.random() * 3}s` }}
+        style={{ animationDelay: `${(creature.id.charCodeAt(0) % 30) / 10}s` }}
       >
         <div className="p-4 sm:p-5">
           {/* Header */}
@@ -1103,20 +1105,38 @@ export default function DeepOceanArchive() {
   const [discoveries, setDiscoveries] = useState<string[]>([]);
   const [showDiscoveryLog, setShowDiscoveryLog] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: -500, y: -500 });
+  const mousePosRef = useRef({ x: -500, y: -500 });
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const cursorLightRef = useRef<HTMLDivElement>(null);
+  const submarineLightRef = useRef<HTMLDivElement>(null);
+  const darknessRef = useRef<HTMLDivElement>(null);
 
   const stopAmbientRef = useRef<(() => void) | null>(null);
   const lastMilestoneRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Track mouse for submarine light
+  // Track mouse via DOM refs — no re-renders
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
+      mousePosRef.current = { x: e.clientX, y: e.clientY };
+      const { x, y } = mousePosRef.current;
+      if (cursorRef.current) {
+        cursorRef.current.style.left = `${x}px`;
+        cursorRef.current.style.top = `${y}px`;
+      }
+      if (cursorLightRef.current) {
+        cursorLightRef.current.style.left = `${x}px`;
+        cursorLightRef.current.style.top = `${y}px`;
+      }
+      if (submarineLightRef.current) {
+        const r = isLightOn ? 350 : 0;
+        submarineLightRef.current.style.left = `${x - r / 2}px`;
+        submarineLightRef.current.style.top = `${y - r / 2}px`;
+      }
     };
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [isLightOn]);
 
   // Scroll-based depth tracking
   useEffect(() => {
@@ -1161,10 +1181,14 @@ export default function DeepOceanArchive() {
     });
   }, [soundEnabled]);
 
-  // Calculate darkness based on depth
-  const darkness = useMemo(() => Math.min(0.85, depth / 11000 * 1.1), [depth]);
+  // Update darkness overlay via ref — no re-renders on scroll
+  useEffect(() => {
+    if (darknessRef.current) {
+      const darkness = Math.min(0.85, depth / 11000 * 1.1);
+      darknessRef.current.style.opacity = String(darkness);
+    }
+  }, [depth]);
 
-  // Light effect opacity
   const lightRadius = isLightOn ? 350 : 0;
 
   return (
@@ -1174,34 +1198,27 @@ export default function DeepOceanArchive() {
       style={{ cursor: 'none' }}
     >
       {/* Custom cursor */}
-      <div
-        className="ocean-cursor"
-        style={{ left: mousePos.x, top: mousePos.y }}
-      />
-      <div
-        className={`ocean-cursor-light ${isLightOn ? 'active' : ''}`}
-        style={{ left: mousePos.x, top: mousePos.y }}
-      />
+      <div ref={cursorRef} className="ocean-cursor" />
+      <div ref={cursorLightRef} className={`ocean-cursor-light ${isLightOn ? 'active' : ''}`} />
 
       {/* Particle system */}
       <ParticleCanvas depth={depth} isLightOn={isLightOn} />
 
       {/* Darkness overlay */}
-      <div className="darkness-overlay" style={{ opacity: darkness }} />
+      <div ref={darknessRef} className="darkness-overlay" style={{ opacity: 0 }} />
 
-      {/* Submarine light effect */}
-      {isLightOn && (
-        <div
-          className="fixed pointer-events-none z-[3] rounded-full transition-opacity duration-500"
-          style={{
-            left: mousePos.x - lightRadius / 2,
-            top: mousePos.y - lightRadius / 2,
-            width: lightRadius,
-            height: lightRadius,
-            background: `radial-gradient(circle, rgba(0,255,209,${0.08 * (1 - darkness * 0.5)}) 0%, transparent 70%)`,
-          }}
-        />
-      )}
+      {/* Submarine light effect — always mounted, hidden when off */}
+      <div
+        ref={submarineLightRef}
+        className="fixed pointer-events-none z-[3] rounded-full"
+        style={{
+          width: lightRadius,
+          height: lightRadius,
+          opacity: isLightOn ? 1 : 0,
+          background: 'radial-gradient(circle, rgba(0,255,209,0.08) 0%, transparent 70%)',
+          transition: 'opacity 0.5s',
+        }}
+      />
 
       {/* HUD */}
       {hasStarted && (
