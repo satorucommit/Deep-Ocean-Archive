@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build && xcopy /E /I /Y .next\\static .next\\standalone\\.next\\static && xcopy /E /I /Y public .next\\standalone\\public",
+    "build": "next build && shx mkdir -p .next/standalone/.next/static && shx cp -r .next/static/* .next/standalone/.next/static && shx cp -r public .next/standalone/",
     "start": "set NODE_ENV=production && bun .next/standalone/server.js",
     "lint": "eslint .",
     "db:push": "prisma db push",
@@ -87,6 +87,7 @@
     "bun-types": "^1.3.4",
     "eslint": "^9",
     "eslint-config-next": "^16.1.1",
+    "shx": "^0.3.4",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
